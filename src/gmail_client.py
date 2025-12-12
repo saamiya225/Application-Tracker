@@ -1,10 +1,12 @@
 import os
 import base64
-from email.mime.text import MIMEText
 from bs4 import BeautifulSoup
+from email.mime.text import MIMEText
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+
 
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify',
@@ -18,20 +20,27 @@ CREDENTIALS_PATH = 'credentials.json'
 def gmail_login():
     creds = None
 
-    if os.path.exists(TOKEN_PATH):
-        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+    # Load saved tokens if they exist
+    if os.path.exists("token.json"):
+        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 
+    # If there are no valid credentials, go through OAuth again
     if not creds or not creds.valid:
-        flow = InstalledAppFlow.from_client_secrets_file(
-            CREDENTIALS_PATH,
-            SCOPES
-        )
-        creds = flow.run_local_server(port=0)
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                "credentials.json", SCOPES
+            )
+            creds = flow.run_local_server(port=0)
 
-        with open(TOKEN_PATH, 'w') as token:
+        # Save token for reuse
+        with open("token.json", "w") as token:
             token.write(creds.to_json())
 
-    return build('gmail', 'v1', credentials=creds)
+    service = build("gmail", "v1", credentials=creds)
+    return service
+
 
 
 def fetch_messages(service, query, max_results=50):
