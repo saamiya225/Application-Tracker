@@ -43,76 +43,26 @@ def gmail_login():
 
 
 
-def fetch_messages(service, query, max_results=50):
-    results = service.users().messages().list(
-        userId='me',
+def fetch_messages(service, query, max_results=5000):
+    """Fetch all messages matching query using pagination."""
+    messages = []
+    request = service.users().messages().list(
+        userId="me",
         q=query,
-        maxResults=max_results
-    ).execute()
+        maxResults=500  # Gmail max is 500 per page
+    )
 
-    messages = results.get('messages', [])
-    output = []
+    while request is not None and len(messages) < max_results:
+        response = request.execute()
+        if "messages" in response:
+            messages.extend(response["messages"])
+        request = service.users().messages().list_next(
+            previous_request=request,
+            previous_response=response
+        )
+    
+    return messages
 
-    for m in messages:
-        message = service.users().messages().get(
-            userId='me',
-            id=m['id'],
-            format='full'
-        ).execute()
-
-        payload = message.get("payload", {})
-        headers = payload.get("headers", [])
-
-        subject = ""
-        sender = ""
-        date = ""
-        body = ""
-
-        for header in headers:
-            h = header["name"].lower()
-            if h == "subject":
-                subject = header["value"]
-            elif h == "from":
-                sender = header["value"]
-            elif h == "date":
-                date = header["value"]
-
-        # Extract body text
-        def walk(part):
-            if part.get("parts"):
-                for p in part["parts"]:
-                    yield from walk(p)
-            else:
-                yield part
-
-        for part in walk(payload):
-            data = part.get("body", {}).get("data")
-            if not data:
-                continue
-
-            decoded = base64.urlsafe_b64decode(data).decode(
-                "utf-8",
-                errors="replace"
-            )
-
-            mime = part.get("mimeType", "")
-
-            if mime == "text/html":
-                soup = BeautifulSoup(decoded, "html.parser")
-                body += soup.get_text(separator=" ", strip=True)
-            else:
-                body += decoded
-
-        output.append({
-            "id": message["id"],
-            "threadId": message.get("threadId"),
-            "subject": subject,
-            "from": sender,
-            "date": date,
-            "body": body
-        })
-
-    return output
 
 
 def send_message(service, to_email, subject, body_text, thread_id=None):
