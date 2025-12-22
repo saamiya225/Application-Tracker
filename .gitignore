@@ -4,3 +4,17 @@ credentials-old.json
 token.json
 credentials.json
 credentials-old.json
+credentials.json
+token.json
+*.db
+*.pem
+*.key
+*.pub
+*.env EOF
+credentials.json
+token.json
+*.db
+*.pem
+*.key
+*.pub
+*.env
